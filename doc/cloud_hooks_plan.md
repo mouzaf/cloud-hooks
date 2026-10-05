@@ -1,6 +1,6 @@
 # Plan: cloud-hooks (`!!` en git-label van de huidige beurt)
 
-Doel: in **alle** cloud-sessies op de qpino-repo, project of niet:
+Doel: in **alle** cloud-sessies, project of niet:
 
 1. `!! <commando>` draait het commando zelf en toont de uitvoer;
 2. de git-status van de **huidige** beurt is zichtbaar (`stop-hook: <label>`).

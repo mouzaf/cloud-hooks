@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Wekelijkse check of de harness (Claude Code, cloud-omgeving, Projects) is
-veranderd op punten waar de cloud-hooks van qpino (.claude/hooks/hooks.py) op
+veranderd op punten waar de cloud-hooks (hooks/hooks.py) op
 leunen. Draait vanuit de routine "Harness-check cloud-hooks".
 
 Deterministisch deel: haalt nieuwe changelog-items op, controleert de
