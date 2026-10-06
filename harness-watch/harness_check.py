@@ -82,11 +82,14 @@ def check_changelog(state, report):
     report['changelog'] = {
         'last_seen_version': last,
         'latest_version': entries[0][0],
+        # Alleen de regels die op KEYWORDS matchen; de rest telt alleen
+        # mee, anders wordt de uitvoer te groot en kapt de routine hem af.
         'new_entries': [
             {'version': v, 'date': d,
-             'keyword_lines': [ln for ln in body.splitlines()
+             'keyword_lines': [ln.strip() for ln in body.splitlines()
                                if KEYWORDS.search(ln)],
-             'text': body}
+             'other_lines': sum(1 for ln in body.splitlines()
+                                if ln.strip() and not KEYWORDS.search(ln))}
             for v, d, body in new],
     }
     state['last_seen_version'] = entries[0][0]
@@ -154,10 +157,16 @@ def check_docs(state, report):
                 old_file.read_text().splitlines(), text.splitlines(),
                 lineterm='', n=0)
                 if ln[:1] in '+-' and not ln.startswith(('+++', '---'))]
+            added = [ln for ln in diff if ln[0] == '+' and KEYWORDS.search(ln)]
+            # Een herschreven regel staat als - en + in de diff; toon de -
+            # alleen als er geen gelijkende + bij is (echt verdwenen tekst).
+            removed = [ln for ln in diff if ln[0] == '-' and KEYWORDS.search(ln)
+                       and not any(difflib.SequenceMatcher(
+                           None, ln[1:], a[1:]).quick_ratio() > 0.8
+                           for a in added)]
             report['docs'][page] = {
                 'changed_lines': len(diff),
-                'keyword_lines': [ln[:300] for ln in diff
-                                  if KEYWORDS.search(ln)][:80],
+                'keyword_lines': [ln[:200] for ln in removed + added][:40],
             }
         hashes[page] = h
         report['_new_docs'][page] = text
