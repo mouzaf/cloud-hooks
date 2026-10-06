@@ -8,8 +8,9 @@ container en diff't relevante doc-pagina's. Het beoordelen of een item echt
 raakt aan onze hooks doet de routine (Claude) daarna met het rapport.
 
 Stand tussen runs: state.json en docs/ in de opgegeven map, anders naast
-dit script. De routine geeft een map buiten de repo mee, zodat het script uit
-een verse clone kan draaien zonder de stand te verliezen. Alleen stdlib.
+dit script. De routine geeft harness-watch/state mee en commit die map na
+elke run naar main, zodat een verse sessie de stand van de vorige run heeft.
+Alleen stdlib.
 Gebruik:  python3 harness_check.py [map]        # rapport (JSON) + stand bijwerken
           python3 harness_check.py [map] --dry  # rapport, stand niet bijwerken
 """
@@ -137,7 +138,7 @@ def check_container(state, report):
 
 
 def check_docs(state, report):
-    DOCS_DIR.mkdir(exist_ok=True)
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
     hashes = state.setdefault('doc_hashes', {})
     report['docs'] = {}
     for page in DOC_PAGES:
