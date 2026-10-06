@@ -63,7 +63,11 @@ def label_from_stderr(stderr):
 
 def git_label(cwd=None):
     """(label of None, waarschuwingen). Hergebruikt de CCR-check, zodat het
-    label altijd overeenkomt met wat de harness zelf als openstaand ziet."""
+    label altijd overeenkomt met wat de harness zelf als openstaand ziet.
+
+    Een project met meerdere repo's start boven de clones, waar de CCR-check
+    niets ziet; dan draait hij per repo eronder en noemt het label alleen de
+    repo's met iets open."""
     if not GIT_CHECK.is_file():
         return None, [warning(f'{GIT_CHECK} ontbreekt, geen git-label')]
     warnings = []
@@ -71,16 +75,53 @@ def git_label(cwd=None):
         warnings.append(warning(
             f'{GIT_CHECK.name} bevat weer `exit 2` en blokkeert dus; '
             'de sed in session-start.sh werkt niet meer'))
+    cwd = Path(cwd or os.getcwd())
+    if in_repo(cwd):
+        label, more = repo_label(cwd)
+        return label, warnings + more
+    parts = []
+    for repo in sub_repos(cwd):
+        label, more = repo_label(repo)
+        warnings += more
+        if label:
+            parts.append(f'{repo.name}: {label}')
+    return (' · '.join(parts) or None), warnings
+
+
+def label_root(data):
+    """Waar het label naar kijkt. De startmap van de sessie, niet de cwd
+    van de hook-input: die volgt Claude's `cd` en zou na een `cd /tmp` een
+    schoon label geven, of in een project met meerdere repo's alleen de repo
+    waar Claude toevallig staat."""
+    return os.environ.get('CLAUDE_PROJECT_DIR') or data.get('cwd')
+
+
+def in_repo(path):
+    proc = subprocess.run(['git', 'rev-parse', '--is-inside-work-tree'],
+                          cwd=path, capture_output=True, text=True, timeout=10)
+    return proc.returncode == 0 and proc.stdout.strip() == 'true'
+
+
+def sub_repos(path):
+    # `.git` kan ook een bestand zijn (worktree, submodule).
+    try:
+        return sorted(d for d in path.iterdir()
+                      if d.is_dir() and (d / '.git').exists())
+    except OSError:
+        return []
+
+
+def repo_label(cwd):
     proc = subprocess.run(['bash', str(GIT_CHECK)], input='{}', cwd=cwd,
                           capture_output=True, text=True, timeout=10)
     if proc.returncode == 0:
-        return None, warnings
+        return None, []
     label = label_from_stderr(proc.stderr)
     if label is None:
         first = (proc.stderr.strip().splitlines() or ['(geen stderr)'])[0]
-        warnings.append(warning(f'onbekende uitvoer van {GIT_CHECK.name}: '
-                                f'{first[:120]}'))
-    return label, warnings
+        return None, [warning(f'onbekende uitvoer van {GIT_CHECK.name} in '
+                              f'{cwd.name}: {first[:120]}')]
+    return label, []
 
 
 # --- `!!` -------------------------------------------------------------------
@@ -209,7 +250,7 @@ def pre_reply(data):
             tool_input.get('text'), str):
         push_pending([warning('reply-input zonder `text`, geen git-label')])
         return None
-    label, warnings = git_label(data.get('cwd'))
+    label, warnings = git_label(label_root(data))
     lines = ([f'stop-hook: {label}'] if label else []) + pop_pending() + warnings
     if not lines:
         return None
@@ -226,7 +267,7 @@ def stop(data):
     # In een project ziet de gebruiker dit niet; daar doet pre-reply het.
     if in_project():
         return None
-    label, warnings = git_label(data.get('cwd'))
+    label, warnings = git_label(label_root(data))
     # De app zet er zelf "Stop says:" voor; "stop-hook:" zou dubbel zijn.
     lines = ([f'git {label}'] if label else []) + warnings
     return {'systemMessage': '\n'.join(lines)} if lines else None

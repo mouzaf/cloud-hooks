@@ -140,6 +140,14 @@ class Labels(unittest.TestCase):
 
 
 class GitLabel(unittest.TestCase):
+    def setUp(self):
+        # Eigen repo als werkmap, zodat de uitkomst niet afhangt van waar de
+        # tests gedraaid worden.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name)
+        subprocess.run(['git', 'init', '-q', str(self.repo)], check=True)
+
     def check_script(self, body):
         f = tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False)
         f.write('#!/bin/bash\n' + body)
@@ -151,29 +159,93 @@ class GitLabel(unittest.TestCase):
 
     def test_schoon(self):
         self.check_script('exit 0\n')
-        self.assertEqual(hooks.git_label(), (None, []))
+        self.assertEqual(hooks.git_label(self.repo), (None, []))
 
     def test_label(self):
         self.check_script('echo "There are untracked files in it." >&2\nexit 1\n')
-        self.assertEqual(hooks.git_label(), ('untracked', []))
+        self.assertEqual(hooks.git_label(self.repo), ('untracked', []))
 
     def test_onbekende_stderr_waarschuwt(self):
         self.check_script('echo "Something new" >&2\nexit 1\n')
-        label, warnings = hooks.git_label()
+        label, warnings = hooks.git_label(self.repo)
         self.assertIsNone(label)
         self.assertIn('Something new', warnings[0])
 
     def test_weer_blokkerend_waarschuwt(self):
         self.check_script('echo "uncommitted changes" >&2\nexit 2\n')
-        label, warnings = hooks.git_label()
+        label, warnings = hooks.git_label(self.repo)
         self.assertEqual(label, 'uncommitted')
         self.assertIn('exit 2', warnings[0])
 
     def test_script_ontbreekt(self):
         with mock.patch.object(hooks, 'GIT_CHECK', Path('/bestaat/niet.sh')):
-            label, warnings = hooks.git_label()
+            label, warnings = hooks.git_label(self.repo)
         self.assertIsNone(label)
         self.assertIn('ontbreekt', warnings[0])
+
+
+class GitLabelMeerdereRepos(unittest.TestCase):
+    """Project met meerdere repo's: de sessie start in de map boven de
+    clones, de CCR-check draait per repo."""
+
+    # Nep-CCR-check die per repo-naam (werkmap) een andere uitkomst geeft.
+    SCRIPT = (
+        'case "$(basename "$PWD")" in\n'
+        '  a) echo "There are untracked files in it." >&2; exit 1;;\n'
+        '  b) echo "There are 2 unpushed commit(s) on branch x." >&2; exit 1;;\n'
+        '  raar) echo "Something new" >&2; exit 1;;\n'
+        'esac\n'
+        'exit 0\n')
+
+    def setUp(self):
+        f = tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False)
+        f.write('#!/bin/bash\n' + self.SCRIPT)
+        f.close()
+        self.addCleanup(os.unlink, f.name)
+        patcher = mock.patch.object(hooks, 'GIT_CHECK', Path(f.name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+
+    def repos(self, *names):
+        for name in names:
+            subprocess.run(['git', 'init', '-q', str(self.root / name)],
+                           check=True)
+
+    def test_alleen_repos_met_iets_open(self):
+        self.repos('a', 'schoon')
+        (self.root / 'geen-repo').mkdir()
+        self.assertEqual(hooks.git_label(self.root), ('a: untracked', []))
+
+    def test_meerdere_open_gesorteerd(self):
+        self.repos('b', 'a')
+        self.assertEqual(hooks.git_label(self.root),
+                         ('a: untracked · b: unpushed', []))
+
+    def test_alles_schoon(self):
+        self.repos('schoon', 'ook-schoon')
+        self.assertEqual(hooks.git_label(self.root), (None, []))
+
+    def test_geen_repos(self):
+        self.assertEqual(hooks.git_label(self.root), (None, []))
+
+    def test_onbekende_uitvoer_noemt_repo(self):
+        self.repos('a', 'raar')
+        label, warnings = hooks.git_label(self.root)
+        self.assertEqual(label, 'a: untracked')
+        self.assertIn('raar', warnings[0])
+
+    def test_startmap_wint_van_cwd(self):
+        with mock.patch.dict(os.environ, {'CLAUDE_PROJECT_DIR': '/start'}):
+            self.assertEqual(hooks.label_root({'cwd': '/tmp'}), '/start')
+        with mock.patch.dict(os.environ, {'CLAUDE_PROJECT_DIR': ''}):
+            self.assertEqual(hooks.label_root({'cwd': '/tmp'}), '/tmp')
+
+    def test_in_een_repo_label_zoals_voorheen(self):
+        self.repos('a')
+        self.assertEqual(hooks.git_label(self.root / 'a'), ('untracked', []))
 
 
 class Events(unittest.TestCase):

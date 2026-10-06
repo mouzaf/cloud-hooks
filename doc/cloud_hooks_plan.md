@@ -38,6 +38,7 @@ Aanroep: `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/hooks.py <event>` met `<ev
 
 - `in_project()`: `CLAUDE_CODE_PROJECTS_SESSION == "1"`.
 - `git_label()`: draait `/root/.claude/stop-hook-git-check.sh`, zet stderr om naar `uncommitted` / `untracked` / `unverified` / `unpushed`, of niets als alles schoon is.
+  Kijkt vanuit de startmap van de sessie (`$CLAUDE_PROJECT_DIR`), niet vanuit Claude's huidige cwd. Is die startmap geen git-repo (project met meerdere repo's), dan draait de check per directe submap met `.git` en wordt het label bijvoorbeeld `qpino: unpushed · microdosing: untracked`, alleen met repo's waar iets openstaat.
 - `bang_command(prompt)`: geeft het `!!`-commando terug of `None`. In een project: body uit `<message trigger="true" from="human">` halen, alleen als niet `edited="true"`, daarna `html.unescape`. Geen wrapper gevonden: terugvallen op de kale prompt.
 - `run_bang(cmd)`: `bash -c` in de bewaarde cwd (`/tmp/bang-cwd`), max 25 s, laatste 50 regels; gedrag als in het huidige `user-prompt-submit.sh`.
 
