@@ -7,9 +7,11 @@ Deterministisch deel: haalt nieuwe changelog-items op, controleert de
 container en diff't relevante doc-pagina's. Het beoordelen of een item echt
 raakt aan onze hooks doet de routine (Claude) daarna met het rapport.
 
-Stand tussen runs: state.json en docs/ naast dit script. Alleen stdlib.
-Gebruik:  python3 harness_check.py          # rapport (JSON) + stand bijwerken
-          python3 harness_check.py --dry    # rapport, stand niet bijwerken
+Stand tussen runs: state.json en docs/ in de opgegeven map, anders naast
+dit script. De routine geeft een map buiten de repo mee, zodat het script uit
+een verse clone kan draaien zonder de stand te verliezen. Alleen stdlib.
+Gebruik:  python3 harness_check.py [map]        # rapport (JSON) + stand bijwerken
+          python3 harness_check.py [map] --dry  # rapport, stand niet bijwerken
 """
 import difflib
 import hashlib
@@ -161,7 +163,12 @@ def check_docs(state, report):
 
 
 def main():
+    global STATE, DOCS_DIR
     dry = '--dry' in sys.argv
+    dirs = [a for a in sys.argv[1:] if a != '--dry']
+    if dirs:
+        STATE = Path(dirs[0]) / 'state.json'
+        DOCS_DIR = Path(dirs[0]) / 'docs'
     state = json.loads(STATE.read_text()) if STATE.is_file() else {}
     report = {'problems': [], '_new_docs': {}}
     check_changelog(state, report)
