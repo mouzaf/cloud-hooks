@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone --depth 1 https://github.com/mouzaf/cloud-hooks /tmp/cloud-hooks*)",
+      "Bash(git -C /tmp/cloud-hooks pull*)",
+      "Bash(python3 /tmp/cloud-hooks/harness-watch/harness_check.py*)"
+    ]
+  }
+}
