@@ -26,5 +26,6 @@ De hooks leunen op details van de harness die zonder aankondiging kunnen verande
 - Die sessie voert [harness-watch/routine-opdracht.md](harness-watch/routine-opdracht.md) uit. Hij draait [harness-watch/harness_check.py](harness-watch/harness_check.py) en beoordeelt het rapport.
 - De stand tussen runs (`state.json`, `docs/`) staat in [harness-watch/state/](harness-watch/state/). De run commit die na afloop naar main.
 - [.claude/settings.json](.claude/settings.json) staat de commando's van die run toe, zodat auto mode ze niet weigert.
+- Punt 7 en 8 (de projectvariabele en de reply-tool) kan die routine buiten een project niet zelf zien. Die controleer je in een projectdraad met [harness-watch/project_check.py](harness-watch/project_check.py), met de eigen toollijst als `--tools`.
 
 De samenvatting van elke run staat in de sessie van die run.
