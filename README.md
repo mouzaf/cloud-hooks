@@ -20,11 +20,11 @@ Het resultaat van het setup-script wordt gecachet. Het script draait opnieuw als
 
 ## Wekelijkse harness-check
 
-De hooks leunen op details van de harness die zonder aankondiging kunnen veranderen. Daarom kijkt er elke week een Claude-draad naar, in het cloud-hooks-project van Wanda:
+De hooks leunen op details van de harness die zonder aankondiging kunnen veranderen. Daarom kijkt er twee keer per week een Claude-routine naar:
 
-- De routine "Harness-check cloud-hooks" is alleen een wekker. Elke maandag om 08:52 laat hij een nieuwe draad "Harness-check dd-mm-jjjj" starten.
-- Die draad voert [harness-watch/routine-opdracht.md](harness-watch/routine-opdracht.md) uit. Hij draait [harness-watch/harness_check.py](harness-watch/harness_check.py) en beoordeelt het rapport.
-- De stand tussen runs (`state.json`, `docs/`) staat in `/mnt/project-files/harness-watch/`, buiten de repo. Het script krijgt die map als argument.
-- [.claude/settings.json](.claude/settings.json) staat de commando's van die draad toe, zodat auto mode ze niet weigert.
+- De routine "Harness-check cloud-hooks" staat buiten een project en start elke maandag en woensdag om 06:52 een verse sessie in deze repo.
+- Die sessie voert [harness-watch/routine-opdracht.md](harness-watch/routine-opdracht.md) uit. Hij draait [harness-watch/harness_check.py](harness-watch/harness_check.py) en beoordeelt het rapport.
+- De stand tussen runs (`state.json`, `docs/`) staat in [harness-watch/state/](harness-watch/state/). De run commit die na afloop naar main.
+- [.claude/settings.json](.claude/settings.json) staat de commando's van die run toe, zodat auto mode ze niet weigert.
 
-De draad meldt zich alleen als er iets is dat de hooks raakt.
+De samenvatting van elke run staat in de sessie van die run.
