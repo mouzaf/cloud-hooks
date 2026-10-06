@@ -24,17 +24,18 @@ Laptop/VPS/TUI blijven ongemoeid: alle hooks doen niets als `CLAUDE_CODE_REMOTE 
 
 ## Bestanden
 
-| Bestand | Status |
+| Bestand | Inhoud |
 |---|---|
-| `.claude/hooks/hooks.py` | **nieuw**: alle logica, alleen stdlib, systeem-`python3` (niet de venv) |
-| `.claude/hooks/session-start.sh` | **bestaat**, ongewijzigd (sed `exit 2`→`exit 1` in de CCR Stop-hook) |
-| `.claude/hooks/user-prompt-submit.sh` | **vervalt**, gaat op in `hooks.py` |
-| `.claude/settings.json` | **bestaat**, aangepast |
-| `test/test_hooks.py` | **nieuw**: `unittest`-tests, ook door pytest op te pakken |
+| `hooks/hooks.py` | alle logica, alleen stdlib, systeem-`python3` |
+| `hooks/session-start.sh` | sed `exit 2`→`exit 1` in de CCR Stop-hook |
+| `install.sh` | zet de hooks in `~/.claude/settings.json` van de container |
+| `test/test_hooks.py` | `unittest`-tests, ook door pytest op te pakken |
+| `harness-watch/` | wekelijkse harness-check, zie de README |
+| `.claude/settings.json` | alleen toestemmingen voor de harness-check, geen hooks |
 
 ## `hooks.py`
 
-Aanroep: `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/hooks.py <event>` met `<event>` = `user-prompt-submit`, `pre-reply` of `stop`. Eén functie per event plus gedeelde helpers:
+Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `install.sh` het zet) met `<event>` = `user-prompt-submit`, `pre-reply` of `stop`. Eén functie per event plus gedeelde helpers:
 
 - `in_project()`: `CLAUDE_CODE_PROJECTS_SESSION == "1"`.
 - `git_label()`: draait `/root/.claude/stop-hook-git-check.sh`, zet stderr om naar `uncommitted` / `untracked` / `unverified` / `unpushed`, of niets als alles schoon is.
@@ -58,20 +59,21 @@ Bij elke aanroep controleert `hooks.py` de aannames hierboven. Klopt er een niet
 - `/root/.claude/stop-hook-git-check.sh` ontbreekt, bevat weer `exit 2` (sed in `session-start.sh` werkt niet meer), of geeft stderr zonder bekend label;
 - reply-input zonder `text`.
 
-## `.claude/settings.json`
+## Registratie (`install.sh`)
 
-- `SessionStart`: `session-start.sh` (ongewijzigd).
-- `UserPromptSubmit`: `hooks.py user-prompt-submit` (vervangt `user-prompt-submit.sh`).
+`install.sh` zet de hooks in de gebruikersinstellingen (`~/.claude/settings.json`), niet in die van een repo: die laden niet in projecten met meerdere repo's. Eerdere regels van deze repo worden vervangen, andere hooks blijven staan.
+
+- `SessionStart`: `session-start.sh`.
+- `UserPromptSubmit`: `hooks.py user-prompt-submit`.
 - `PreToolUse`, matcher `mcp__hearthbot__reply`: `hooks.py pre-reply`.
 - `Stop`: `hooks.py stop`.
 
 ## Tests
 
-`test/test_hooks.py` met `unittest` (de systeem-`python3` heeft geen pytest, de venv is er niet altijd; `python3 -m unittest test.test_hooks` werkt niet omdat de stdlib zelf een package `test` heeft):
+`test/test_hooks.py` met `unittest` (de systeem-`python3` heeft geen pytest; `python3 -m unittest test.test_hooks` werkt niet omdat de stdlib zelf een package `test` heeft):
 
 ```
-python3 test/test_hooks.py      # overal
-venv/bin/python -m pytest test/test_hooks.py   # waar de venv er is
+python3 test/test_hooks.py
 ```
 
 Gedekt: wrapper-parsing (meerregelig, entities, `from="system"`, `edited="true"`, geen wrapper), label-mapping vanuit voorbeeld-stderr, `pre-reply` behoudt overige velden, waarschuwingen.
@@ -82,13 +84,6 @@ Gedekt: wrapper-parsing (meerregelig, entities, `from="system"`, `edited="true"`
 - Het label hangt aan `reply`: twee replies in één beurt geven twee labels, `no_reply_needed` geeft er geen.
 - Een commit of push na de laatste reply telt pas in de volgende beurt mee.
 - `!!` buiten het permissiesysteem om, geen tty, max 25 s (zoals nu).
-
-## Opruiming
-
-- `.claude/hooks/hooktest.sh` verwijderen.
-- De `hooktest`-registraties uit `.claude/settings.json` halen.
-- `.claude/hooks/user-prompt-submit.sh` verwijderen.
-- `/tmp/hooktest/` verdwijnt met de container; niets te doen.
 
 ## Teststappen voor Wanda
 
