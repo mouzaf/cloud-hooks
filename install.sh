@@ -50,3 +50,13 @@ for event, entries in ours.items():
 settings.write_text(json.dumps(s, indent=2) + '\n')
 print(f'cloud-hooks: {len(ours)} hooks gezet in {settings}')
 EOF
+
+# `url` print de claude.ai-link van deze sessie. Een script in PATH in plaats
+# van een alias, zodat het ook in niet-interactieve shells (Claude's Bash-tool)
+# werkt. Overschrijven bij elke run houdt dit herhaalbaar.
+cat > /usr/local/bin/url <<'URL'
+#!/bin/bash
+echo "https://claude.ai/code/${CLAUDE_CODE_REMOTE_SESSION_ID/#cse_/session_}"
+URL
+chmod +x /usr/local/bin/url
+echo 'cloud-hooks: /usr/local/bin/url gezet'
