@@ -17,6 +17,10 @@ Elke nieuwe cloud-sessie met die environment heeft dan de hooks: één of meer r
 
 Het resultaat van het setup-script wordt gecachet. Het script draait opnieuw als je het setup-script of de netwerk-instellingen van de environment wijzigt, en verder ongeveer eens per zeven dagen. Pas dan komt een nieuwe versie van de hooks binnen.
 
+## Het commando `url`
+
+`install.sh` zet naast de hooks ook het commando `url` in `/usr/local/bin`. Het print de claude.ai-link van de huidige sessie.
+
 ## Wekelijkse harness-check
 
 De hooks leunen op details van de harness die zonder aankondiging kunnen veranderen. Daarom kijkt er twee keer per week een Claude-routine naar:
