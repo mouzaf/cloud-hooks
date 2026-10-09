@@ -8,8 +8,7 @@ Ontwerp en achtergrond: [doc/cloud_hooks_plan.md](doc/cloud_hooks_plan.md).
 Zet in het setup-script van de cloud environment (claude.ai/code, environment-instellingen):
 
 ```bash
-{ git clone --depth 1 https://github.com/mouzaf/cloud-hooks ~/.claude/cloud-hooks &&
-  ~/.claude/cloud-hooks/install.sh; } || echo "cloud-hooks: installatie mislukt" >&2
+{ git clone --depth 1 https://github.com/mouzaf/cloud-hooks ~/.claude/cloud-hooks && ~/.claude/cloud-hooks/install.sh; } || echo "cloud-hooks: installatie mislukt" >&2
 ```
 
 Een setup-script dat niet met 0 eindigt, laat de sessie niet starten; de `||` zorgt dat een mislukte installatie alleen de hooks kost.
