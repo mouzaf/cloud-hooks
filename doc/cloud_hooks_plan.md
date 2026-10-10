@@ -27,7 +27,7 @@ Laptop/VPS/TUI blijven ongemoeid: alle hooks doen niets als `CLAUDE_CODE_REMOTE 
 | Bestand | Inhoud |
 |---|---|
 | `hooks/hooks.py` | alle logica, alleen stdlib, systeem-`python3` |
-| `hooks/session-start.sh` | sed `exit 2`→`exit 1` in de CCR Stop-hook |
+| `hooks/session-start.sh` | kopie van de CCR Stop-hook voor `hooks.py`, daarna die hook stil zetten (elke niet-nul `exit` → `exit 0`) |
 | `install.sh` | zet de hooks in `~/.claude/settings.json` van de container |
 | `test/test_hooks.py` | `unittest`-tests, ook door pytest op te pakken |
 | `harness-watch/` | wekelijkse harness-check, zie de README |
@@ -38,7 +38,7 @@ Laptop/VPS/TUI blijven ongemoeid: alle hooks doen niets als `CLAUDE_CODE_REMOTE 
 Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `install.sh` het zet) met `<event>` = `user-prompt-submit`, `pre-reply` of `stop`. Eén functie per event plus gedeelde helpers:
 
 - `in_project()`: `CLAUDE_CODE_PROJECTS_SESSION == "1"`.
-- `git_label()`: draait `/root/.claude/stop-hook-git-check.sh`, zet stderr om naar `uncommitted` / `untracked` / `unverified` / `unpushed`, of niets als alles schoon is.
+- `git_label()`: draait `/root/.claude/stop-hook-git-check.orig.sh` (ongewijzigde kopie van de CCR-check, zie hieronder), zet stderr om naar `uncommitted` / `untracked` / `unverified` / `unpushed`, of niets als alles schoon is.
   Kijkt vanuit de startmap van de sessie (`$CLAUDE_PROJECT_DIR`), niet vanuit Claude's huidige cwd. Is die startmap geen git-repo (project met meerdere repo's), dan draait de check per directe submap met `.git` en wordt het label bijvoorbeeld `qpino: unpushed · microdosing: untracked`, alleen met repo's waar iets openstaat.
 - `bang_command(prompt)`: geeft het `!!`-commando terug of `None`. In een project: body uit `<message trigger="true" from="human">` halen, alleen als niet `edited="true"`, daarna `html.unescape`. Geen wrapper gevonden: terugvallen op de kale prompt.
 - `run_bang(cmd)`: `bash -c` in de bewaarde cwd (`/tmp/bang-cwd`), max 25 s, laatste 50 regels; gedrag als in het huidige `user-prompt-submit.sh`.
@@ -56,8 +56,18 @@ Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `inst
 Bij elke aanroep controleert `hooks.py` de aannames hierboven. Klopt er een niet, dan komt er een waarschuwing `⚠ cloud-hooks: <wat> — zie doc/cloud_hooks_plan.md`. Buiten een project verschijnt die via `systemMessage`, in een project onder de volgende reply: `user-prompt-submit` zet hem in `/tmp/cloud-hooks-warnings` en `pre-reply` neemt hem mee. Ook een crash van `hooks.py` zelf wordt zo gemeld. Controles:
 
 - project-sessie, `!!` in de prompt, maar geen `<message trigger="true">` (niet elke prompt in een project heeft er een, bv. relays van de coordinator; daarom alleen bij `!!`);
-- `/root/.claude/stop-hook-git-check.sh` ontbreekt, bevat weer `exit 2` (sed in `session-start.sh` werkt niet meer), of geeft stderr zonder bekend label;
+- de kopie `/root/.claude/stop-hook-git-check.orig.sh` ontbreekt of geeft stderr zonder bekend label;
+- `/root/.claude/stop-hook-git-check.sh` heeft weer een niet-nul `exit` (sed in `session-start.sh` werkt niet meer);
 - reply-input zonder `text`.
+
+## De CCR Stop-hook stil zetten (`session-start.sh`)
+
+De harness registreert zelf `/root/.claude/stop-hook-git-check.sh` als Stop-hook (in `/root/.claude/launcher-settings.json`) en schrijft dat script bij elke start opnieuw.
+
+- Met `exit 2` dwingt die hook Claude te committen en pushen.
+- Met `exit 1` blokkeert hij niet, maar toont de app zijn stderr als hook-fout. Die komt een beurt te laat, naast ons eigen `Stop says: git <label>`, en gaf zo dubbele, achterlopende meldingen buiten projecten (2026-10-10).
+
+Daarom kopieert `session-start.sh` het script eerst ongewijzigd naar `stop-hook-git-check.orig.sh` en zet daarna in het origineel elke niet-nul `exit` op `exit 0`, met een markeerregel onderaan. De markering voorkomt dat een tweede SessionStart (`clear`, `compact`) de kopie overschrijft met het gepatchte script. Herschrijft de harness het script, dan ontbreekt de markering en wordt de kopie ververst. `launcher-settings.json` blijft onaangeroerd: die laadt vóór onze SessionStart en wordt bij elke start opnieuw geschreven.
 
 ## Registratie (`install.sh`)
 

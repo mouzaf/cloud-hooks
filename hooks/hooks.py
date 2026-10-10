@@ -22,7 +22,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-GIT_CHECK = Path('/root/.claude/stop-hook-git-check.sh')
+# De CCR-check zelf zet session-start.sh stil (alle exits 0); hooks.py draait
+# de ongewijzigde kopie die session-start.sh daarvoor maakt.
+HARNESS_CHECK = Path('/root/.claude/stop-hook-git-check.sh')
+GIT_CHECK = Path('/root/.claude/stop-hook-git-check.orig.sh')
 # /tmp: buiten de repo, verdwijnt met de container.
 CWD_FILE = Path('/tmp/bang-cwd')
 # Waarschuwingen uit hooks waarvan de uitvoer in een project onzichtbaar is,
@@ -62,19 +65,25 @@ def label_from_stderr(stderr):
 
 
 def git_label(cwd=None):
-    """(label of None, waarschuwingen). Hergebruikt de CCR-check, zodat het
-    label altijd overeenkomt met wat de harness zelf als openstaand ziet.
+    """(label of None, waarschuwingen). Hergebruikt (een kopie van) de
+    CCR-check, zodat het label altijd overeenkomt met wat de harness zelf als
+    openstaand ziet.
 
     Een project met meerdere repo's start boven de clones, waar de CCR-check
     niets ziet; dan draait hij per repo eronder en noemt het label alleen de
     repo's met iets open."""
     if not GIT_CHECK.is_file():
-        return None, [warning(f'{GIT_CHECK} ontbreekt, geen git-label')]
+        return None, [warning(f'{GIT_CHECK} ontbreekt (maakt '
+                              'session-start.sh), geen git-label')]
     warnings = []
-    if re.search(r'\bexit 2\b', GIT_CHECK.read_text()):
+    try:
+        harness_src = HARNESS_CHECK.read_text()
+    except OSError:
+        harness_src = ''
+    if re.search(r'\bexit +(?!0\b)\S', harness_src):
         warnings.append(warning(
-            f'{GIT_CHECK.name} bevat weer `exit 2` en blokkeert dus; '
-            'de sed in session-start.sh werkt niet meer'))
+            f'{HARNESS_CHECK.name} heeft weer een niet-nul `exit` en geeft '
+            'dus eigen meldingen; de sed in session-start.sh werkt niet meer'))
     cwd = Path(cwd or os.getcwd())
     if in_repo(cwd):
         label, more = repo_label(cwd)

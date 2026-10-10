@@ -116,6 +116,25 @@ class RunBang(unittest.TestCase):
         self.assertIn('10 regels afgekapt', out[-1])
 
 
+def script_file(test, body):
+    """Tijdelijk bash-script; pad als Path."""
+    f = tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False)
+    f.write('#!/bin/bash\n' + body)
+    f.close()
+    test.addCleanup(os.unlink, f.name)
+    return Path(f.name)
+
+
+def patch(test, name, value):
+    patcher = mock.patch.object(hooks, name, value)
+    patcher.start()
+    test.addCleanup(patcher.stop)
+
+
+# Het CCR-script zoals session-start.sh het achterlaat: stil.
+STIL = 'exit 0\n# cloud-hooks: alle exits op 0 gezet door session-start.sh\n'
+
+
 class Labels(unittest.TestCase):
     # Eerste regel van elke stderr-tak uit /root/.claude/stop-hook-git-check.sh
     STDERR = {
@@ -147,15 +166,10 @@ class GitLabel(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.repo = Path(tmp.name)
         subprocess.run(['git', 'init', '-q', str(self.repo)], check=True)
+        patch(self, 'HARNESS_CHECK', script_file(self, STIL))
 
     def check_script(self, body):
-        f = tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False)
-        f.write('#!/bin/bash\n' + body)
-        f.close()
-        self.addCleanup(os.unlink, f.name)
-        patcher = mock.patch.object(hooks, 'GIT_CHECK', Path(f.name))
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        patch(self, 'GIT_CHECK', script_file(self, body))
 
     def test_schoon(self):
         self.check_script('exit 0\n')
@@ -171,11 +185,19 @@ class GitLabel(unittest.TestCase):
         self.assertIsNone(label)
         self.assertIn('Something new', warnings[0])
 
-    def test_weer_blokkerend_waarschuwt(self):
-        self.check_script('echo "uncommitted changes" >&2\nexit 2\n')
-        label, warnings = hooks.git_label(self.repo)
-        self.assertEqual(label, 'uncommitted')
-        self.assertIn('exit 2', warnings[0])
+    def test_harness_check_niet_stil_waarschuwt(self):
+        self.check_script('echo "uncommitted changes" >&2\nexit 1\n')
+        for body in ['exit 1\n', 'exit 2\n', 'exit $code\n']:
+            patch(self, 'HARNESS_CHECK', script_file(self, body))
+            label, warnings = hooks.git_label(self.repo)
+            self.assertEqual(label, 'uncommitted')
+            self.assertEqual(len(warnings), 1, body)
+            self.assertIn('niet-nul `exit`', warnings[0])
+
+    def test_harness_check_ontbreekt_is_geen_probleem(self):
+        self.check_script('exit 0\n')
+        patch(self, 'HARNESS_CHECK', Path('/bestaat/niet.sh'))
+        self.assertEqual(hooks.git_label(self.repo), (None, []))
 
     def test_script_ontbreekt(self):
         with mock.patch.object(hooks, 'GIT_CHECK', Path('/bestaat/niet.sh')):
@@ -198,13 +220,8 @@ class GitLabelMeerdereRepos(unittest.TestCase):
         'exit 0\n')
 
     def setUp(self):
-        f = tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False)
-        f.write('#!/bin/bash\n' + self.SCRIPT)
-        f.close()
-        self.addCleanup(os.unlink, f.name)
-        patcher = mock.patch.object(hooks, 'GIT_CHECK', Path(f.name))
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        patch(self, 'GIT_CHECK', script_file(self, self.SCRIPT))
+        patch(self, 'HARNESS_CHECK', script_file(self, STIL))
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
@@ -328,6 +345,67 @@ class Events(unittest.TestCase):
             with self.env(project):
                 prompt = wake('hallo') if project else 'hallo'
                 self.assertIsNone(hooks.user_prompt_submit({'prompt': prompt}))
+
+
+class SessionStart(unittest.TestCase):
+    """hooks/session-start.sh op een nagemaakt CCR-script."""
+
+    SH = HOOKS_PY.parent / 'session-start.sh'
+    ORIGINEEL = ('if a; then\n  echo "x" >&2\n  exit 2\nfi\n'
+                 'if b; then exit 1; fi\nexit 0\n')
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.target = Path(tmp.name) / 'check.sh'
+        self.copy = Path(tmp.name) / 'check.orig.sh'
+        self.target.write_text(self.ORIGINEEL)
+
+    def run_sh(self, remote='true'):
+        env = {**os.environ, 'CLAUDE_CODE_REMOTE': remote,
+               'CLOUD_HOOKS_GIT_CHECK': str(self.target),
+               'CLOUD_HOOKS_GIT_CHECK_COPY': str(self.copy)}
+        subprocess.run(['bash', str(self.SH)], env=env, check=True)
+
+    def test_kopie_en_stil(self):
+        self.run_sh()
+        self.assertEqual(self.copy.read_text(), self.ORIGINEEL)
+        patched = self.target.read_text()
+        self.assertNotRegex(patched, r'exit +[1-9]')
+        self.assertIn('  exit 0\nfi\nif b; then exit 0; fi', patched)
+
+    def test_tweede_keer_laat_kopie_staan(self):
+        # clear/compact: SessionStart draait opnieuw op het gepatchte script
+        self.run_sh()
+        patched = self.target.read_text()
+        self.run_sh()
+        self.assertEqual(self.copy.read_text(), self.ORIGINEEL)
+        self.assertEqual(self.target.read_text(), patched)
+
+    def test_door_harness_herschreven_ververst_kopie(self):
+        self.run_sh()
+        nieuw = self.ORIGINEEL.replace('"x"', '"y"')
+        self.target.write_text(nieuw)
+        self.run_sh()
+        self.assertEqual(self.copy.read_text(), nieuw)
+
+    def test_buiten_cloud_niets(self):
+        self.run_sh(remote='')
+        self.assertFalse(self.copy.exists())
+        self.assertEqual(self.target.read_text(), self.ORIGINEEL)
+
+    def test_samen_met_hooks_py(self):
+        # Na session-start.sh geeft de kopie het label en waarschuwt
+        # hooks.py niet over het stille origineel.
+        self.target.write_text('echo "There are untracked files." >&2\n'
+                               'exit 2\n')
+        self.run_sh()
+        patch(self, 'GIT_CHECK', self.copy)
+        patch(self, 'HARNESS_CHECK', self.target)
+        repo = Path(tempfile.mkdtemp())
+        self.addCleanup(subprocess.run, ['rm', '-rf', str(repo)])
+        subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+        self.assertEqual(hooks.git_label(repo), ('untracked', []))
 
 
 class Main(unittest.TestCase):
