@@ -34,6 +34,10 @@ DOC_PAGES = ['hooks', 'claude-projects', 'claude-code-on-the-web']
 DOC_URL = 'https://code.claude.com/docs/en/{}.md'
 
 GIT_CHECK = Path('/root/.claude/stop-hook-git-check.sh')
+# Ongewijzigde kopie die session-start.sh maakt voordat hij GIT_CHECK stil
+# zet; hooks.py draait die kopie.
+GIT_CHECK_COPY = Path('/root/.claude/stop-hook-git-check.orig.sh')
+GIT_CHECK_MARKER = '# cloud-hooks: alle exits op 0 gezet door session-start.sh'
 LAUNCHER = Path.home() / '.claude' / 'launcher-settings.json'
 # stderr-teksten waar hooks.py (LABELS) op matcht
 GIT_CHECK_NEEDLES = ['uncommitted changes', 'untracked files', 'Unverified',
@@ -112,15 +116,28 @@ def check_container(state, report):
         report['problems'].append(f'{GIT_CHECK} ontbreekt')
     else:
         src = GIT_CHECK.read_text()
+        if GIT_CHECK_MARKER not in src.splitlines():
+            report['problems'].append(
+                f'{GIT_CHECK.name} is niet door session-start.sh stil gezet '
+                '(markeerregel ontbreekt)')
+        elif re.search(r'\bexit +(?!0\b)\S', src):
+            report['problems'].append(
+                f'{GIT_CHECK.name} heeft na session-start.sh nog een niet-nul '
+                '`exit` en geeft dus eigen meldingen; pas de sed aan')
+    if not GIT_CHECK_COPY.is_file():
+        report['problems'].append(f'{GIT_CHECK_COPY} ontbreekt (maakt '
+                                  'session-start.sh; hooks.py draait hem)')
+    else:
+        src = GIT_CHECK_COPY.read_text()
         missing = [n for n in GIT_CHECK_NEEDLES if n not in src]
         if missing:
             report['problems'].append(
-                f'{GIT_CHECK.name} bevat niet meer: {missing} '
+                f'{GIT_CHECK_COPY.name} bevat niet meer: {missing} '
                 '(labels in hooks.py matchen daar op)')
-        if not re.search(r'\bexit [12]\b', src):
+        if not re.search(r'\bexit +[1-9]', src):
             report['problems'].append(
-                f'{GIT_CHECK.name} heeft geen `exit 1`/`exit 2` meer; '
-                'de sed in session-start.sh doet dan mogelijk niets')
+                f'{GIT_CHECK_COPY.name} heeft geen niet-nul `exit` meer; '
+                'hooks.py leidt het label daar van af')
 
     try:
         hooks = json.loads(LAUNCHER.read_text()).get('hooks', {})
