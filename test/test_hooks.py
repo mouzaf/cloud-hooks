@@ -253,7 +253,8 @@ class Events(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         for name, value in [('PENDING_FILE', Path(tmp.name) / 'pending'),
-                            ('CWD_FILE', Path(tmp.name) / 'bang-cwd')]:
+                            ('CWD_FILE', Path(tmp.name) / 'bang-cwd'),
+                            ('BANG_TURN_FILE', Path(tmp.name) / 'bang-turn')]:
             patcher = mock.patch.object(hooks, name, value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -328,6 +329,31 @@ class Events(unittest.TestCase):
             with self.env(project):
                 prompt = wake('hallo') if project else 'hallo'
                 self.assertIsNone(hooks.user_prompt_submit({'prompt': prompt}))
+
+    def test_bang_beurt_eindigt_na_reply(self):
+        with self.env(True):
+            hooks.user_prompt_submit({'prompt': wake('!! echo hoi')})
+            out = hooks.post_reply({})
+            self.assertIs(out['continue'], False)
+            # alleen de eerste reply van de beurt
+            self.assertIsNone(hooks.post_reply({}))
+
+    def test_gewone_beurt_loopt_door_na_reply(self):
+        with self.env(True):
+            hooks.user_prompt_submit({'prompt': wake('hallo')})
+            self.assertIsNone(hooks.post_reply({}))
+
+    def test_oude_markering_breekt_volgende_beurt_niet_af(self):
+        with self.env(True):
+            hooks.user_prompt_submit({'prompt': wake('!! echo hoi')})
+            # geen reply in die beurt; dan een gewoon bericht
+            hooks.user_prompt_submit({'prompt': wake('hallo')})
+            self.assertIsNone(hooks.post_reply({}))
+
+    def test_post_reply_buiten_project_doet_niets(self):
+        hooks.BANG_TURN_FILE.touch()
+        with self.env(False):
+            self.assertIsNone(hooks.post_reply({}))
 
 
 class Main(unittest.TestCase):

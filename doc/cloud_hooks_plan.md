@@ -35,7 +35,7 @@ Laptop/VPS/TUI blijven ongemoeid: alle hooks doen niets als `CLAUDE_CODE_REMOTE 
 
 ## `hooks.py`
 
-Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `install.sh` het zet) met `<event>` = `user-prompt-submit`, `pre-reply` of `stop`. Eén functie per event plus gedeelde helpers:
+Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `install.sh` het zet) met `<event>` = `user-prompt-submit`, `pre-reply`, `post-reply` of `stop`. Eén functie per event plus gedeelde helpers:
 
 - `in_project()`: `CLAUDE_CODE_PROJECTS_SESSION == "1"`.
 - `git_label()`: draait `/root/.claude/stop-hook-git-check.sh`, zet stderr om naar `uncommitted` / `untracked` / `unverified` / `unpushed`, of niets als alles schoon is.
@@ -49,6 +49,7 @@ Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `inst
 |---|---|---|
 | UserPromptSubmit | `!!`: uitvoeren, blokkeren, uitvoer als `reason` (zoals nu) | `!!`: uitvoeren, niet blokkeren, uitvoer als `additionalContext` met de opdracht hem letterlijk als reply in een codeblok te zetten |
 | PreToolUse, matcher `mcp__hearthbot__reply` | n.v.t. | volledige `tool_input` teruggeven met `stop-hook: <label>` onder `text` |
+| PostToolUse, matcher `mcp__hearthbot__reply` | n.v.t. | in een `!!`-beurt: `{"continue": false}`, zodat de beurt direct na de reply eindigt |
 | Stop | `{"systemMessage": "git <label>"}` (de app toont "Stop says: git <label>") | niets |
 
 ### Zelfcontrole
@@ -66,7 +67,12 @@ Bij elke aanroep controleert `hooks.py` de aannames hierboven. Klopt er een niet
 - `SessionStart`: `session-start.sh`.
 - `UserPromptSubmit`: `hooks.py user-prompt-submit`.
 - `PreToolUse`, matcher `mcp__hearthbot__reply`: `hooks.py pre-reply`.
+- `PostToolUse`, matcher `mcp__hearthbot__reply`: `hooks.py post-reply`.
 - `Stop`: `hooks.py stop`.
+
+### Waarom `post-reply`
+
+Zonder deze hook doet het model na de reply met de `!!`-uitvoer nog twee aanroepen: `no_reply_needed` en een afsluitende, elk met de hele context (±225k tokens). Gemeten op 2026-10-11 kostte dat ±4 s, waarin de draad nog bezig lijkt. `user-prompt-submit` zet bij een `!!` in een project `/tmp/cloud-hooks-bang-turn`. `post-reply` ziet dat bestand na de eerste reply, verwijdert het en geeft `continue: false` terug. Elk ander bericht verwijdert een achtergebleven markering, zodat die nooit een gewone beurt afbreekt. Gewone beurten raakt dit niet: daar is een reply vaak een tussenbericht.
 
 ## Tests
 
@@ -76,11 +82,11 @@ Bij elke aanroep controleert `hooks.py` de aannames hierboven. Klopt er een niet
 python3 test/test_hooks.py
 ```
 
-Gedekt: wrapper-parsing (meerregelig, entities, `from="system"`, `edited="true"`, geen wrapper), label-mapping vanuit voorbeeld-stderr, `pre-reply` behoudt overige velden, waarschuwingen.
+Gedekt: wrapper-parsing (meerregelig, entities, `from="system"`, `edited="true"`, geen wrapper), label-mapping vanuit voorbeeld-stderr, `pre-reply` behoudt overige velden, `post-reply` alleen in een `!!`-beurt, waarschuwingen.
 
 ## Bekende beperkingen
 
-- In een project kost `!!` een kleine model-call; de uitvoer is zo letterlijk als Claude hem overneemt.
+- In een project kost `!!` een kleine model-call; de uitvoer is zo letterlijk als Claude hem overneemt. Na die reply stopt `post-reply` de beurt.
 - Het label hangt aan `reply`: twee replies in één beurt geven twee labels, `no_reply_needed` geeft er geen.
 - Een commit of push na de laatste reply telt pas in de volgende beurt mee.
 - `!!` buiten het permissiesysteem om, geen tty, max 25 s (zoals nu).
@@ -102,8 +108,9 @@ Na de implementatie, op de branch:
 6. Bewerk dat bericht → het commando draait niet opnieuw.
 7. Laat Claude een bestand aanpassen zonder te committen → `stop-hook: uncommitted` onder de reply, in dezelfde beurt.
 8. Vraag om een reply met een bijlage of link → de linkkaart staat er nog.
+9. Na `!! date` eindigt de beurt direct na de reply: in het transcript volgt er geen `no_reply_needed` meer.
 
 **Overal:**
 
-9. `python3 test/test_hooks.py` → alles groen.
-10. Geen `⚠ cloud-hooks`-waarschuwing tijdens stap 1 t/m 8.
+10. `python3 test/test_hooks.py` → alles groen.
+11. Geen `⚠ cloud-hooks`-waarschuwing tijdens stap 1 t/m 9.

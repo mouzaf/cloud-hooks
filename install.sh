@@ -35,6 +35,7 @@ ours = {
     'SessionStart': [entry(f'"{here}/hooks/session-start.sh"')],
     'UserPromptSubmit': [entry(f'{hooks_py} user-prompt-submit')],
     'PreToolUse': [entry(f'{hooks_py} pre-reply', 'mcp__hearthbot__reply')],
+    'PostToolUse': [entry(f'{hooks_py} post-reply', 'mcp__hearthbot__reply')],
     'Stop': [entry(f'{hooks_py} stop')],
 }
 
