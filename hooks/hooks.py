@@ -3,7 +3,7 @@
 beurt, in project- en niet-project-sessies. Zie doc/cloud_hooks_plan.md.
 
 Aanroep vanuit .claude/settings.json:
-    python3 hooks.py user-prompt-submit | pre-reply | stop
+    python3 hooks.py user-prompt-submit | pre-reply | post-reply | stop
 
 Alleen stdlib en de systeem-python3: hooks draaien ook als de venv er (nog)
 niet is. Buiten cloud-sessies doet dit script niets; laptop/VPS/TUI hebben
@@ -31,6 +31,9 @@ CWD_FILE = Path('/tmp/bang-cwd')
 # Waarschuwingen uit hooks waarvan de uitvoer in een project onzichtbaar is,
 # tot de volgende reply ze meeneemt.
 PENDING_FILE = Path('/tmp/cloud-hooks-warnings')
+# Bestaat tijdens een `!!`-beurt in een project, tot de reply met de uitvoer
+# geplaatst is; post-reply beëindigt de beurt dan.
+BANG_TURN_FILE = Path('/tmp/cloud-hooks-bang-turn')
 
 BANG_TIMEOUT = 25  # hook-timeout is 30 s; daarboven gooit CC de uitvoer weg
 BANG_MAX_LINES = 50
@@ -226,8 +229,12 @@ def user_prompt_submit(data):
         # Hook-uitvoer is in een project onzichtbaar: alleen wat Claude met
         # de berichttools post, komt bij de gebruiker.
         push_pending(warnings)
+        # Een markering van een eerdere beurt (geen reply gekomen) mag de
+        # eerste reply van deze beurt niet afbreken.
+        BANG_TURN_FILE.unlink(missing_ok=True)
         if cmd is None:
             return None
+        BANG_TURN_FILE.touch()
         out = run_bang(cmd) if cmd else USAGE
         return {'hookSpecificOutput': {
             'hookEventName': 'UserPromptSubmit',
@@ -272,6 +279,20 @@ def pre_reply(data):
                                    'updatedInput': new_input}}
 
 
+def post_reply(data):
+    """Na de reply met de `!!`-uitvoer de beurt beëindigen. Zonder dit doet
+    het model nog twee aanroepen (no_reply_needed en een afsluitende), elk met
+    de hele context: ±4 s waarin de draad nog bezig lijkt."""
+    if not in_project():
+        return None
+    try:
+        BANG_TURN_FILE.unlink()
+    except FileNotFoundError:
+        return None
+    return {'continue': False, 'stopReason': '`!!`-uitvoer geplaatst',
+            'suppressOutput': True}
+
+
 def stop(data):
     # In een project ziet de gebruiker dit niet; daar doet pre-reply het.
     if in_project():
@@ -285,6 +306,7 @@ def stop(data):
 EVENTS = {
     'user-prompt-submit': user_prompt_submit,
     'pre-reply': pre_reply,
+    'post-reply': post_reply,
     'stop': stop,
 }
 
