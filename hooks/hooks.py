@@ -48,6 +48,7 @@ LABELS = [
 
 MESSAGE_RE = re.compile(r'<message\b([^>]*)>(.*?)</message>', re.DOTALL)
 ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
+BANG_INTENT_RE = re.compile(r'\A\s*!!|<message\b[^>]*>\s*!!')
 
 
 def warning(what):
@@ -157,8 +158,10 @@ def bang_command(prompt, project):
         if found is None:
             # Niet elke prompt in een project heeft een trigger-message
             # (relays, cross-session-berichten); alleen waarschuwen als het
-            # er op lijkt dat iemand een `!!` bedoelde.
-            if '!!' not in prompt:
+            # er op lijkt dat iemand een `!!` bedoelde: een kale prompt die
+            # ermee begint, of een <message> waarvan de tekst ermee begint.
+            # Een `!!` elders (bv. een relay die over `!!` praat) telt niet.
+            if not BANG_INTENT_RE.search(prompt):
                 return None, []
             return None, [warning('`!!` gezien, maar geen '
                                   '<message trigger="true"> in de prompt')]

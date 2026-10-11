@@ -72,6 +72,18 @@ class BangCommandProject(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIn('trigger="true"', warnings[0])
 
+    def test_relay_die_over_bang_praat_is_stil(self):
+        prompt = ('<coordinator-relay><note>bij een `!!`-bericht stopt de '
+                  'beurt</note><cited author="user">\n  !! date\n</cited>'
+                  '</coordinator-relay>')
+        self.assertEqual(hooks.bang_command(prompt, True), (None, []))
+
+    def test_message_zonder_trigger_met_bang_waarschuwt(self):
+        prompt = wake('!! ls').replace('trigger="true"', 'trigger="ja"')
+        cmd, warnings = hooks.bang_command(prompt, True)
+        self.assertIsNone(cmd)
+        self.assertEqual(len(warnings), 1)
+
     def test_bang_zonder_commando(self):
         self.assertEqual(hooks.bang_command(wake('!!'), True), ('', []))
 

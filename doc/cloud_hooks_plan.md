@@ -56,7 +56,7 @@ Aanroep: `python3 ~/.claude/cloud-hooks/hooks/hooks.py <event>` (pad zoals `inst
 
 Bij elke aanroep controleert `hooks.py` de aannames hierboven. Klopt er een niet, dan komt er een waarschuwing `⚠ cloud-hooks: <wat> — zie doc/cloud_hooks_plan.md`. Buiten een project verschijnt die via `systemMessage`, in een project onder de volgende reply: `user-prompt-submit` zet hem in `/tmp/cloud-hooks-warnings` en `pre-reply` neemt hem mee. Ook een crash van `hooks.py` zelf wordt zo gemeld. Controles:
 
-- project-sessie, `!!` in de prompt, maar geen `<message trigger="true">` (niet elke prompt in een project heeft er een, bv. relays van de coordinator; daarom alleen bij `!!`);
+- project-sessie, prompt of `<message>`-tekst begint met `!!`, maar geen `<message trigger="true">` (niet elke prompt in een project heeft er een, bv. relays van de coordinator; een `!!` midden in zo'n relay telt daarom niet);
 - de kopie `/root/.claude/stop-hook-git-check.orig.sh` ontbreekt of geeft stderr zonder bekend label;
 - `/root/.claude/stop-hook-git-check.sh` heeft weer een niet-nul `exit` (sed in `session-start.sh` werkt niet meer);
 - reply-input zonder `text`.
