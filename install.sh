@@ -52,12 +52,33 @@ settings.write_text(json.dumps(s, indent=2) + '\n')
 print(f'cloud-hooks: {len(ours)} hooks gezet in {settings}')
 EOF
 
-# `url` print de claude.ai-link van deze sessie. Een script in PATH in plaats
-# van een alias, zodat het ook in niet-interactieve shells (Claude's Bash-tool)
-# werkt. Overschrijven bij elke run houdt dit herhaalbaar.
-cat > /usr/local/bin/url <<'URL'
+# `wanda_url` print de claude.ai-link van deze sessie. Een script in PATH in
+# plaats van een alias, zodat het ook in niet-interactieve shells (Claude's
+# Bash-tool) werkt. Overschrijven bij elke run houdt dit herhaalbaar.
+cat > /usr/local/bin/wanda_url <<'URL'
 #!/bin/bash
 echo "https://claude.ai/code/${CLAUDE_CODE_REMOTE_SESSION_ID/#cse_/session_}"
 URL
-chmod +x /usr/local/bin/url
-echo 'cloud-hooks: /usr/local/bin/url gezet'
+chmod +x /usr/local/bin/wanda_url
+echo 'cloud-hooks: /usr/local/bin/wanda_url gezet'
+
+# `wanda_renew` haalt de nieuwste main op en draait dit script en
+# session-start.sh opnieuw, voor een lopende sessie waarin het gecachete
+# setup-script een oudere versie zette of SessionStart nooit draaide.
+# session-start.sh is herhaalbaar: een al gepatcht git-check-script laat het
+# staan. Bash leest het {}-blok in zijn geheel voordat het iets uitvoert, dus
+# het maakt niet uit dat install.sh wanda_renew intussen overschrijft.
+cat > /usr/local/bin/wanda_renew <<RENEW
+#!/bin/bash
+set -euo pipefail
+{
+    cd "$HERE"
+    git fetch --depth 1 origin main
+    git reset --hard FETCH_HEAD
+    ./install.sh
+    ./hooks/session-start.sh
+    exit
+}
+RENEW
+chmod +x /usr/local/bin/wanda_renew
+echo 'cloud-hooks: /usr/local/bin/wanda_renew gezet'
