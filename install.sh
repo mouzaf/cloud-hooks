@@ -55,7 +55,6 @@ EOF
 # `wanda_url` print de claude.ai-link van deze sessie. Een script in PATH in
 # plaats van een alias, zodat het ook in niet-interactieve shells (Claude's
 # Bash-tool) werkt. Overschrijven bij elke run houdt dit herhaalbaar.
-rm -f /usr/local/bin/url  # oude naam
 cat > /usr/local/bin/wanda_url <<'URL'
 #!/bin/bash
 echo "https://claude.ai/code/${CLAUDE_CODE_REMOTE_SESSION_ID/#cse_/session_}"
