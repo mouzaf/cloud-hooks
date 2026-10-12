@@ -62,17 +62,23 @@ URL
 chmod +x /usr/local/bin/wanda_url
 echo 'cloud-hooks: /usr/local/bin/wanda_url gezet'
 
-# `wanda_renew` haalt de nieuwste main op en draait dit script opnieuw, voor een
-# lopende sessie waarin het gecachete setup-script een oudere versie zette.
-# Dankzij `exec` leest bash wanda_renew niet verder terwijl install.sh het
-# overschrijft.
+# `wanda_renew` haalt de nieuwste main op en draait dit script en
+# session-start.sh opnieuw, voor een lopende sessie waarin het gecachete
+# setup-script een oudere versie zette of SessionStart nooit draaide.
+# session-start.sh is herhaalbaar: een al gepatcht git-check-script laat het
+# staan. Bash leest het {}-blok in zijn geheel voordat het iets uitvoert, dus
+# het maakt niet uit dat install.sh wanda_renew intussen overschrijft.
 cat > /usr/local/bin/wanda_renew <<RENEW
 #!/bin/bash
 set -euo pipefail
-cd "$HERE"
-git fetch --depth 1 origin main
-git reset --hard FETCH_HEAD
-exec ./install.sh
+{
+    cd "$HERE"
+    git fetch --depth 1 origin main
+    git reset --hard FETCH_HEAD
+    ./install.sh
+    ./hooks/session-start.sh
+    exit
+}
 RENEW
 chmod +x /usr/local/bin/wanda_renew
 echo 'cloud-hooks: /usr/local/bin/wanda_renew gezet'
