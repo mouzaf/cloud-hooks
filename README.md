@@ -17,9 +17,12 @@ Elke nieuwe cloud-sessie met die environment heeft dan de hooks: één of meer r
 
 Het resultaat van het setup-script wordt gecachet. Het script draait opnieuw als je het setup-script of de netwerk-instellingen van de environment wijzigt, en verder ongeveer eens per zeven dagen. Pas dan komt een nieuwe versie van de hooks binnen.
 
-## Het commando `url`
+## De commando's `wanda_url` en `wanda_renew`
 
-`install.sh` zet naast de hooks ook het commando `url` in `/usr/local/bin`. Het print de claude.ai-link van de huidige sessie.
+`install.sh` zet naast de hooks ook twee commando's in `/usr/local/bin`:
+
+- `wanda_url` print de claude.ai-link van de huidige sessie.
+- `wanda_renew` haalt de nieuwste main op en draait `install.sh` opnieuw. Typ in een lopende sessie `!! wanda_renew` om die de nieuwe versie te geven. Gewijzigde hookscripts en hookregels gelden meteen: Claude Code ziet wijzigingen in `settings.json` via een file watcher.
 
 ## Wekelijkse harness-check
 
