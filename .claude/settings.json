@@ -5,7 +5,8 @@
       "Bash(git add harness-watch/state*)",
       "Bash(git commit -m harness-check*)",
       "Bash(git pull --rebase origin main*)",
-      "Bash(git push origin HEAD:main*)"
+      "Bash(git push origin HEAD:main*)",
+      "Bash(cd ~/.claude/cloud-hooks && git fetch --depth 1 origin main && git reset --hard FETCH_HEAD && ./install.sh)"
     ]
   }
 }
