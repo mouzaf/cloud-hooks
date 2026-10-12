@@ -22,7 +22,7 @@ Het resultaat van het setup-script wordt gecachet. Het script draait opnieuw als
 `install.sh` zet naast de hooks ook twee commando's in `/usr/local/bin`:
 
 - `wanda_url` print de claude.ai-link van de huidige sessie.
-- `wanda_renew` haalt de nieuwste main op en draait `install.sh` opnieuw. Typ in een lopende sessie `!! wanda_renew` om die de nieuwe versie te geven. Gewijzigde hookscripts gelden meteen; nieuwe of gewijzigde hookregels in `settings.json` waarschijnlijk pas in een nieuwe sessie.
+- `wanda_renew` haalt de nieuwste main op en draait `install.sh` opnieuw. Typ in een lopende sessie `!! wanda_renew` om die de nieuwe versie te geven. Gewijzigde hookscripts en hookregels gelden meteen: Claude Code ziet wijzigingen in `settings.json` via een file watcher.
 
 ## Wekelijkse harness-check
 
