@@ -1,5 +1,5 @@
 {
-  "last_seen_version": "2.1.302",
+  "last_seen_version": "2.1.303",
   "launcher_hooks": [
     "Stop: ~/.claude/stop-hook-git-check.sh"
   ],
