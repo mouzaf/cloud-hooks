@@ -61,13 +61,27 @@ def vkey(v):
 
 
 def changelog_entries(text):
-    """[(versie, datum, tekst)], nieuwste eerst."""
+    """[(versie, datum, tekst)], nieuwste eerst.
+
+    De pagina is gerenderde markdown: elke versie begint met een regel
+    `**2.1.306**`, zonder datum (datum is dan None). Tussenkopjes als
+    `**Added**` en `**6 bug fixes**` vallen weg. Het oude formaat met
+    <Update label="..." description="...">-blokken wordt ook nog gelezen.
+    """
     parts = re.split(r'(<Update label="([^"]+)" description="([^"]*)">)', text)
     out = []
     # split geeft: pre, tag, label, desc, body, tag, label, desc, body, ...
     for i in range(1, len(parts) - 3, 4):
         body = parts[i + 3].split('</Update>')[0].strip()
         out.append((parts[i + 1], parts[i + 2], body))
+    if out:
+        return out
+    parts = re.split(r'^\*\*(\d+(?:\.\d+)+)\*\*[ \t]*$', text, flags=re.M)
+    # split geeft: pre, versie, body, versie, body, ...
+    for i in range(1, len(parts) - 1, 2):
+        body = '\n'.join(ln for ln in parts[i + 1].splitlines()
+                         if not re.fullmatch(r'\s*\*\*[^*]+\*\*\s*', ln))
+        out.append((parts[i], None, body.strip()))
     return out
 
 
@@ -78,8 +92,9 @@ def check_changelog(state, report):
         report['problems'].append(f'changelog niet op te halen: {e}')
         return
     if not entries:
-        report['problems'].append('changelog-formaat onbekend: geen '
-                                  '<Update label=...>-items gevonden')
+        report['problems'].append(
+            'changelog-formaat onbekend: geen versie-items '
+            '(<Update label=...> of **x.y.z**) gevonden')
         return
     last = state.get('last_seen_version')
     new = [e for e in entries if last is None or vkey(e[0]) > vkey(last)]
