@@ -1,11 +1,11 @@
 {
-  "last_seen_version": "2.1.328",
+  "last_seen_version": "2.1.329",
   "launcher_hooks": [
     "Stop: ~/.claude/stop-hook-git-check.sh"
   ],
   "doc_hashes": {
-    "hooks": "40e9159a6c1d852ad9210eecddc38a392629867551d9a66c80323025e7eee641",
+    "hooks": "d55a7aff8ea51f8313b678ce1156d51dc20d90b11795b6c43c3e90f98b939727",
     "claude-projects": "99294585588ebcabab7cb31a2cd83436a11c2f9750a386ad2016c5d0fc671215",
-    "claude-code-on-the-web": "6fc0212c5c97dcc54ede2ee54a2099621e2ff8b8dc6204c59e323ce68dfec532"
+    "claude-code-on-the-web": "180cc074fed80873985cf9ebc6ae48245622bfa4c281f8a0bbbfe0b54b6dde58"
   }
 }
