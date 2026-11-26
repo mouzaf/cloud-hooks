@@ -4,7 +4,7 @@
     "Stop: ~/.claude/stop-hook-git-check.sh"
   ],
   "doc_hashes": {
-    "hooks": "194272edd023a34be015d351c402c3ca166d84ebfd9b50215b204f09553e3099",
+    "hooks": "d16003851f60562eaa793e6270316b17550f8e24691214d7d798e5a503537c79",
     "claude-projects": "bb001025ad31826102295f48c7f08ae68f7560834511163e29f6e6b6d604c893",
     "claude-code-on-the-web": "7b934fc27f3b6d36679e41bf2867f359de2680603f8625cfe09128246dd6e27f"
   }
